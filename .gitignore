@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.vscode/
+.azure/
+
+# 顧客環境のレポート画像・作業メモ・旧方式/生成物
+*.png
+目的.md
+ingest/publish-catalog-runbook.ps1
+ingest/catalog-logic-app.json

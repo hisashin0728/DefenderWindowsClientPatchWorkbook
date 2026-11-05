@@ -1,0 +1,1289 @@
+{
+  "Snapshot_Time": {
+    "type": "Compose",
+    "inputs": "@utcNow()"
+  },
+  "Catalog_Initialize": {
+    "type": "InitializeVariable",
+    "runAfter": {
+      "Snapshot_Time": [
+        "Succeeded"
+      ]
+    },
+    "inputs": {
+      "variables": [
+        {
+          "name": "CatalogProductsNext",
+          "type": "string",
+          "value": "https://graph.microsoft.com/beta/admin/windows/updates/products?$expand=revisions($expand=catalogEntry,knowledgeBaseArticle)"
+        },
+        {
+          "name": "CatalogVisitedProducts",
+          "type": "array",
+          "value": []
+        },
+        {
+          "name": "CatalogRawRevisions",
+          "type": "array",
+          "value": []
+        },
+        {
+          "name": "CatalogRevisionsNext",
+          "type": "string",
+          "value": ""
+        },
+        {
+          "name": "CatalogVisitedRevisions",
+          "type": "array",
+          "value": []
+        },
+        {
+          "name": "CatalogRows",
+          "type": "array",
+          "value": []
+        },
+        {
+          "name": "CatalogHasError",
+          "type": "boolean",
+          "value": false
+        }
+      ]
+    }
+  },
+  "Catalog_Collection": {
+    "type": "Scope",
+    "runAfter": {
+      "Catalog_Initialize": [
+        "Succeeded"
+      ]
+    },
+    "actions": {
+      "Catalog_Product_Pages": {
+        "type": "Until",
+        "expression": "@empty(variables('CatalogProductsNext'))",
+        "limit": {
+          "count": 100,
+          "timeout": "PT30M"
+        },
+        "actions": {
+          "Catalog_Product_Page": {
+            "type": "Scope",
+            "actions": {
+              "Catalog_Validate_Product_URL": {
+                "type": "ParseJson",
+                "inputs": {
+                  "content": {
+                    "valid": "@and(startsWith(variables('CatalogProductsNext'), 'https://graph.microsoft.com/beta/admin/windows/updates/'), not(contains(variables('CatalogProductsNext'), '#')), not(contains(variables('CatalogVisitedProducts'), variables('CatalogProductsNext'))))"
+                  },
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "valid"
+                    ],
+                    "properties": {
+                      "valid": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "Catalog_Mark_Product_URL": {
+                "type": "AppendToArrayVariable",
+                "runAfter": {
+                  "Catalog_Validate_Product_URL": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "name": "CatalogVisitedProducts",
+                  "value": "@variables('CatalogProductsNext')"
+                }
+              },
+              "Catalog_Get_Products": {
+                "type": "Http",
+                "runAfter": {
+                  "Catalog_Mark_Product_URL": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "method": "GET",
+                  "uri": "@variables('CatalogProductsNext')",
+                  "headers": {
+                    "Prefer": "odata.maxpagesize=100"
+                  },
+                  "authentication": {
+                    "type": "ManagedServiceIdentity",
+                    "audience": "https://graph.microsoft.com"
+                  },
+                  "retryPolicy": {
+                    "type": "exponential",
+                    "count": 3,
+                    "interval": "PT1M"
+                  }
+                }
+              },
+              "Catalog_Parse_Products": {
+                "type": "ParseJson",
+                "runAfter": {
+                  "Catalog_Get_Products": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "content": "@body('Catalog_Get_Products')",
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "array",
+                        "items": {
+                          "type": "object"
+                        }
+                      },
+                      "@@odata.nextLink": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "Catalog_Validate_Product_Response": {
+                "type": "ParseJson",
+                "runAfter": {
+                  "Catalog_Parse_Products": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "content": {
+                    "valid": "@and(not(contains(body('Catalog_Get_Products'), 'error')), lessOrEquals(div(mul(length(base64(string(body('Catalog_Get_Products')))), 3), 4), 10000000))"
+                  },
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "valid"
+                    ],
+                    "properties": {
+                      "valid": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "Catalog_Filter_Products": {
+                "type": "Query",
+                "runAfter": {
+                  "Catalog_Validate_Product_Response": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "from": "@body('Catalog_Parse_Products')['value']",
+                  "where": "@or(contains(createArray('Windows 10', 'Windows 11'), item()?['groupName']), equals(item()?['name'], 'Windows 10'), equals(item()?['name'], 'Windows 11'), startsWith(string(item()?['name']), 'Windows 10,'), startsWith(string(item()?['name']), 'Windows 11,'), startsWith(string(item()?['name']), 'Windows 10 '), startsWith(string(item()?['name']), 'Windows 11 '))"
+                }
+              },
+              "Catalog_For_Each_Product": {
+                "type": "Foreach",
+                "runAfter": {
+                  "Catalog_Filter_Products": [
+                    "Succeeded"
+                  ]
+                },
+                "foreach": "@body('Catalog_Filter_Products')",
+                "runtimeConfiguration": {
+                  "concurrency": {
+                    "repetitions": 1
+                  }
+                },
+                "actions": {
+                  "Catalog_Parse_Product": {
+                    "type": "ParseJson",
+                    "inputs": {
+                      "content": "@items('Catalog_For_Each_Product')",
+                      "schema": {
+                        "type": "object",
+                        "required": [
+                          "revisions"
+                        ],
+                        "properties": {
+                          "revisions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            }
+                          },
+                          "revisions@odata.nextLink": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Product_Family": {
+                    "type": "Compose",
+                    "runAfter": {
+                      "Catalog_Parse_Product": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": "@if(equals(items('Catalog_For_Each_Product')?['groupName'], 'Windows 10'), 'Windows10', if(equals(items('Catalog_For_Each_Product')?['groupName'], 'Windows 11'), 'Windows11', if(or(equals(items('Catalog_For_Each_Product')?['name'], 'Windows 10'), startsWith(string(items('Catalog_For_Each_Product')?['name']), 'Windows 10,'), startsWith(string(items('Catalog_For_Each_Product')?['name']), 'Windows 10 ')), 'Windows10', 'Windows11')))"
+                  },
+                  "Catalog_Seed_Revisions": {
+                    "type": "SetVariable",
+                    "runAfter": {
+                      "Catalog_Product_Family": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "name": "CatalogRawRevisions",
+                      "value": "@body('Catalog_Parse_Product')['revisions']"
+                    }
+                  },
+                  "Catalog_Seed_Revision_URL": {
+                    "type": "SetVariable",
+                    "runAfter": {
+                      "Catalog_Seed_Revisions": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "name": "CatalogRevisionsNext",
+                      "value": "@coalesce(body('Catalog_Parse_Product')?['revisions@odata.nextLink'], '')"
+                    }
+                  },
+                  "Catalog_Clear_Revision_Visited": {
+                    "type": "SetVariable",
+                    "runAfter": {
+                      "Catalog_Seed_Revision_URL": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "name": "CatalogVisitedRevisions",
+                      "value": []
+                    }
+                  },
+                  "Catalog_Revision_Pages": {
+                    "type": "Until",
+                    "runAfter": {
+                      "Catalog_Clear_Revision_Visited": [
+                        "Succeeded"
+                      ]
+                    },
+                    "expression": "@empty(variables('CatalogRevisionsNext'))",
+                    "limit": {
+                      "count": 1000,
+                      "timeout": "PT30M"
+                    },
+                    "actions": {
+                      "Catalog_Revision_Page_Failed": {
+                        "type": "Scope",
+                        "runAfter": {
+                          "Catalog_If_Revision_Page": [
+                            "Failed",
+                            "TimedOut"
+                          ]
+                        },
+                        "actions": {
+                          "Catalog_Mark_Revision_Error": {
+                            "type": "SetVariable",
+                            "inputs": {
+                              "name": "CatalogHasError",
+                              "value": true
+                            }
+                          },
+                          "Catalog_Stop_Revision_Pages": {
+                            "type": "SetVariable",
+                            "runAfter": {
+                              "Catalog_Mark_Revision_Error": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "name": "CatalogRevisionsNext",
+                              "value": ""
+                            }
+                          }
+                        }
+                      },
+                      "Catalog_If_Revision_Page": {
+                        "type": "If",
+                        "expression": "@not(empty(variables('CatalogRevisionsNext')))",
+                        "else": {
+                          "actions": {}
+                        },
+                        "actions": {
+                          "Catalog_Validate_Revision_URL": {
+                            "type": "ParseJson",
+                            "inputs": {
+                              "content": {
+                                "valid": "@and(startsWith(variables('CatalogRevisionsNext'), 'https://graph.microsoft.com/beta/admin/windows/updates/'), not(contains(variables('CatalogRevisionsNext'), '#')), not(contains(variables('CatalogVisitedRevisions'), variables('CatalogRevisionsNext'))))"
+                              },
+                              "schema": {
+                                "type": "object",
+                                "required": [
+                                  "valid"
+                                ],
+                                "properties": {
+                                  "valid": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "Catalog_Mark_Revision_URL": {
+                            "type": "AppendToArrayVariable",
+                            "runAfter": {
+                              "Catalog_Validate_Revision_URL": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "name": "CatalogVisitedRevisions",
+                              "value": "@variables('CatalogRevisionsNext')"
+                            }
+                          },
+                          "Catalog_Get_Revisions": {
+                            "type": "Http",
+                            "runAfter": {
+                              "Catalog_Mark_Revision_URL": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "method": "GET",
+                              "uri": "@variables('CatalogRevisionsNext')",
+                              "headers": {
+                                "Prefer": "odata.maxpagesize=100"
+                              },
+                              "authentication": {
+                                "type": "ManagedServiceIdentity",
+                                "audience": "https://graph.microsoft.com"
+                              },
+                              "retryPolicy": {
+                                "type": "exponential",
+                                "count": 3,
+                                "interval": "PT1M"
+                              }
+                            }
+                          },
+                          "Catalog_Parse_Revision_Page": {
+                            "type": "ParseJson",
+                            "runAfter": {
+                              "Catalog_Get_Revisions": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "content": "@body('Catalog_Get_Revisions')",
+                              "schema": {
+                                "type": "object",
+                                "required": [
+                                  "value"
+                                ],
+                                "properties": {
+                                  "value": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object"
+                                    }
+                                  },
+                                  "@@odata.nextLink": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "Catalog_Validate_Revision_Response": {
+                            "type": "ParseJson",
+                            "runAfter": {
+                              "Catalog_Parse_Revision_Page": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "content": {
+                                "valid": "@and(not(contains(body('Catalog_Get_Revisions'), 'error')), lessOrEquals(div(mul(length(base64(string(body('Catalog_Get_Revisions')))), 3), 4), 10000000))"
+                              },
+                              "schema": {
+                                "type": "object",
+                                "required": [
+                                  "valid"
+                                ],
+                                "properties": {
+                                  "valid": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "Catalog_Merge_Revisions": {
+                            "type": "Compose",
+                            "runAfter": {
+                              "Catalog_Validate_Revision_Response": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": "@union(variables('CatalogRawRevisions'), body('Catalog_Parse_Revision_Page')['value'])"
+                          },
+                          "Catalog_Save_Revisions": {
+                            "type": "SetVariable",
+                            "runAfter": {
+                              "Catalog_Merge_Revisions": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "name": "CatalogRawRevisions",
+                              "value": "@outputs('Catalog_Merge_Revisions')"
+                            }
+                          },
+                          "Catalog_Next_Revision_URL": {
+                            "type": "SetVariable",
+                            "runAfter": {
+                              "Catalog_Save_Revisions": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "name": "CatalogRevisionsNext",
+                              "value": "@coalesce(body('Catalog_Parse_Revision_Page')?['@odata.nextLink'], '')"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Validate_Revision_Paging": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Revision_Pages": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": {
+                        "valid": "@and(empty(variables('CatalogRevisionsNext')), not(variables('CatalogHasError')))"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "required": [
+                          "valid"
+                        ],
+                        "properties": {
+                          "valid": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Quality_Candidates": {
+                    "type": "Query",
+                    "runAfter": {
+                      "Catalog_Validate_Revision_Paging": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@variables('CatalogRawRevisions')",
+                      "where": "@and(not(and(equals(item()?['catalogEntry'], null), equals(item()?['knowledgeBaseArticle'], null))), not(equals(item()?['catalogEntry']?['@odata.type'], '#microsoft.graph.windowsUpdates.featureUpdateCatalogEntry')))"
+                    }
+                  },
+                  "Catalog_Parse_Quality_Revisions": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Quality_Candidates": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": "@body('Catalog_Quality_Candidates')",
+                      "schema": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "catalogEntry",
+                            "knowledgeBaseArticle",
+                            "product",
+                            "isHotpatchUpdate"
+                          ],
+                          "properties": {
+                            "catalogEntry": {
+                              "type": "object",
+                              "required": [
+                                "@@odata.type"
+                              ],
+                              "properties": {
+                                "@@odata.type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "#microsoft.graph.windowsUpdates.qualityUpdateCatalogEntry"
+                                  ]
+                                }
+                              }
+                            },
+                            "knowledgeBaseArticle": {
+                              "type": "object"
+                            },
+                            "product": {
+                              "type": "string",
+                              "enum": [
+                                "Windows 10",
+                                "Windows 11"
+                              ]
+                            },
+                            "isHotpatchUpdate": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Mismatched_Families": {
+                    "type": "Query",
+                    "runAfter": {
+                      "Catalog_Parse_Quality_Revisions": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_Parse_Quality_Revisions')",
+                      "where": "@not(equals(replace(item()['product'], ' ', ''), outputs('Catalog_Product_Family')))"
+                    }
+                  },
+                  "Catalog_Validate_Families": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Mismatched_Families": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": {
+                        "valid": "@empty(body('Catalog_Mismatched_Families'))"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "required": [
+                          "valid"
+                        ],
+                        "properties": {
+                          "valid": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Exclude_Hotpatch": {
+                    "type": "Query",
+                    "runAfter": {
+                      "Catalog_Validate_Families": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_Parse_Quality_Revisions')",
+                      "where": "@equals(item()['isHotpatchUpdate'], false)"
+                    }
+                  },
+                  "Catalog_Parse_Update_Metadata": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Exclude_Hotpatch": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": "@body('Catalog_Exclude_Hotpatch')",
+                      "schema": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "releaseDateTime",
+                            "catalogEntry"
+                          ],
+                          "properties": {
+                            "releaseDateTime": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "catalogEntry": {
+                              "type": "object",
+                              "required": [
+                                "releaseDateTime",
+                                "qualityUpdateCadence",
+                                "qualityUpdateClassification"
+                              ],
+                              "properties": {
+                                "releaseDateTime": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "qualityUpdateCadence": {
+                                  "type": "string",
+                                  "enum": [
+                                    "monthly",
+                                    "outOfBand"
+                                  ]
+                                },
+                                "qualityUpdateClassification": {
+                                  "type": "string",
+                                  "enum": [
+                                    "security",
+                                    "nonSecurity",
+                                    "all"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Invalid_UTC_Dates": {
+                    "type": "Query",
+                    "runAfter": {
+                      "Catalog_Parse_Update_Metadata": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_Parse_Update_Metadata')",
+                      "where": "@not(and(or(endsWith(item()['releaseDateTime'], 'Z'), endsWith(item()['releaseDateTime'], '+00:00')), or(endsWith(item()['catalogEntry']['releaseDateTime'], 'Z'), endsWith(item()['catalogEntry']['releaseDateTime'], '+00:00'))))"
+                    }
+                  },
+                  "Catalog_Validate_UTC_Dates": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Invalid_UTC_Dates": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": {
+                        "valid": "@empty(body('Catalog_Invalid_UTC_Dates'))"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "required": [
+                          "valid"
+                        ],
+                        "properties": {
+                          "valid": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Published_Revisions": {
+                    "type": "Query",
+                    "runAfter": {
+                      "Catalog_Validate_UTC_Dates": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_Parse_Update_Metadata')",
+                      "where": "@and(lessOrEquals(ticks(item()['releaseDateTime']), ticks(outputs('Snapshot_Time'))), lessOrEquals(ticks(item()['catalogEntry']['releaseDateTime']), ticks(outputs('Snapshot_Time'))))"
+                    }
+                  },
+                  "Catalog_Parse_Published_Builds": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Published_Revisions": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": "@body('Catalog_Published_Revisions')",
+                      "schema": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "osBuild",
+                            "knowledgeBaseArticle"
+                          ],
+                          "properties": {
+                            "osBuild": {
+                              "type": "object",
+                              "required": [
+                                "majorVersion",
+                                "minorVersion",
+                                "buildNumber",
+                                "updateBuildRevision"
+                              ],
+                              "properties": {
+                                "majorVersion": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "minorVersion": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "buildNumber": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                },
+                                "updateBuildRevision": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              }
+                            },
+                            "knowledgeBaseArticle": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "url"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 6,
+                                  "maxLength": 10
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_KB_References": {
+                    "type": "Select",
+                    "runAfter": {
+                      "Catalog_Parse_Published_Builds": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_Parse_Published_Builds')",
+                      "select": {
+                        "Digits": "@if(startsWith(toUpper(item()['knowledgeBaseArticle']['id']), 'KB'), substring(item()['knowledgeBaseArticle']['id'], 2), item()['knowledgeBaseArticle']['id'])",
+                        "Url": "@item()['knowledgeBaseArticle']['url']"
+                      }
+                    }
+                  },
+                  "Catalog_Invalid_KB_References": {
+                    "type": "Query",
+                    "runAfter": {
+                      "Catalog_KB_References": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_KB_References')",
+                      "where": "@not(and(greaterOrEquals(length(item()['Digits']), 6), lessOrEquals(length(item()['Digits']), 8), empty(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(item()['Digits'], '0', ''), '1', ''), '2', ''), '3', ''), '4', ''), '5', ''), '6', ''), '7', ''), '8', ''), '9', '')), equals(toLower(uriScheme(item()['Url'])), 'https'), equals(toLower(uriHost(item()['Url'])), 'support.microsoft.com'), equals(uriPort(item()['Url']), 443), not(contains(split(item()['Url'], '/')[2], '@'))))"
+                    }
+                  },
+                  "Catalog_Validate_KB_References": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Invalid_KB_References": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": {
+                        "valid": "@empty(body('Catalog_Invalid_KB_References'))"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "required": [
+                          "valid"
+                        ],
+                        "properties": {
+                          "valid": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Invalid_Months": {
+                    "type": "Query",
+                    "runAfter": {
+                      "Catalog_Validate_KB_References": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_Parse_Published_Builds')",
+                      "where": "@and(equals(item()['catalogEntry']['qualityUpdateCadence'], 'monthly'), equals(item()['catalogEntry']['qualityUpdateClassification'], 'security'), not(equals(formatDateTime(item()['releaseDateTime'], 'yyyy-MM'), formatDateTime(item()['catalogEntry']['releaseDateTime'], 'yyyy-MM'))))"
+                    }
+                  },
+                  "Catalog_Validate_Months": {
+                    "type": "ParseJson",
+                    "runAfter": {
+                      "Catalog_Invalid_Months": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "content": {
+                        "valid": "@empty(body('Catalog_Invalid_Months'))"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "required": [
+                          "valid"
+                        ],
+                        "properties": {
+                          "valid": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Catalog_Normalize_Builds": {
+                    "type": "Select",
+                    "runAfter": {
+                      "Catalog_Validate_Months": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "from": "@body('Catalog_Parse_Published_Builds')",
+                      "select": {
+                        "SnapshotId": "@workflow().run.name",
+                        "SnapshotTime": "@outputs('Snapshot_Time')",
+                        "RecordType": "Build",
+                        "Family": "@outputs('Catalog_Product_Family')",
+                        "BaseVersion": "@concat(string(item()['osBuild']['majorVersion']), '.', string(item()['osBuild']['minorVersion']), '.', string(item()['osBuild']['buildNumber']))",
+                        "FullVersion": "@concat(string(item()['osBuild']['majorVersion']), '.', string(item()['osBuild']['minorVersion']), '.', string(item()['osBuild']['buildNumber']), '.', string(item()['osBuild']['updateBuildRevision']))",
+                        "Revision": "@item()['osBuild']['updateBuildRevision']",
+                        "ReleaseMonth": "@startOfMonth(item()['catalogEntry']['releaseDateTime'])",
+                        "ReleaseDate": "@item()['releaseDateTime']",
+                        "PatchId": "@concat('KB', if(startsWith(toUpper(item()['knowledgeBaseArticle']['id']), 'KB'), substring(item()['knowledgeBaseArticle']['id'], 2), item()['knowledgeBaseArticle']['id']))",
+                        "ReleaseKind": "@if(equals(item()['catalogEntry']['qualityUpdateCadence'], 'outOfBand'), 'OOB', if(equals(item()['catalogEntry']['qualityUpdateClassification'], 'security'), 'B', if(equals(item()['catalogEntry']['qualityUpdateClassification'], 'nonSecurity'), 'Preview', 'Other')))",
+                        "SourceUrl": "@item()['knowledgeBaseArticle']['url']"
+                      }
+                    }
+                  },
+                  "Catalog_Merge_Builds": {
+                    "type": "Compose",
+                    "runAfter": {
+                      "Catalog_Normalize_Builds": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": "@union(variables('CatalogRows'), body('Catalog_Normalize_Builds'))"
+                  },
+                  "Catalog_Save_Builds": {
+                    "type": "SetVariable",
+                    "runAfter": {
+                      "Catalog_Merge_Builds": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "name": "CatalogRows",
+                      "value": "@outputs('Catalog_Merge_Builds')"
+                    }
+                  }
+                }
+              },
+              "Catalog_Next_Product_URL": {
+                "type": "SetVariable",
+                "runAfter": {
+                  "Catalog_For_Each_Product": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "name": "CatalogProductsNext",
+                  "value": "@coalesce(body('Catalog_Parse_Products')?['@odata.nextLink'], '')"
+                }
+              }
+            }
+          },
+          "Catalog_Product_Page_Failed": {
+            "type": "Scope",
+            "runAfter": {
+              "Catalog_Product_Page": [
+                "Failed",
+                "TimedOut"
+              ]
+            },
+            "actions": {
+              "Catalog_Mark_Product_Error": {
+                "type": "SetVariable",
+                "inputs": {
+                  "name": "CatalogHasError",
+                  "value": true
+                }
+              },
+              "Catalog_Stop_Product_Pages": {
+                "type": "SetVariable",
+                "runAfter": {
+                  "Catalog_Mark_Product_Error": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "name": "CatalogProductsNext",
+                  "value": ""
+                }
+              }
+            }
+          }
+        }
+      },
+      "Catalog_Validate_Product_Paging": {
+        "type": "ParseJson",
+        "runAfter": {
+          "Catalog_Product_Pages": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "content": {
+            "valid": "@and(empty(variables('CatalogProductsNext')), not(variables('CatalogHasError')))"
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "valid"
+            ],
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Catalog_Build_Keys": {
+        "type": "Select",
+        "runAfter": {
+          "Catalog_Validate_Product_Paging": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "from": "@variables('CatalogRows')",
+          "select": {
+            "Family": "@item()['Family']",
+            "FullVersion": "@item()['FullVersion']",
+            "ReleaseDate": "@item()['ReleaseDate']",
+            "PatchId": "@item()['PatchId']",
+            "ReleaseKind": "@item()['ReleaseKind']"
+          }
+        }
+      },
+      "Catalog_Validate_Unique_Builds": {
+        "type": "ParseJson",
+        "runAfter": {
+          "Catalog_Build_Keys": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "content": {
+            "valid": "@equals(length(variables('CatalogRows')), length(union(body('Catalog_Build_Keys'), body('Catalog_Build_Keys'))))"
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "valid"
+            ],
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Catalog_Monthly_Windows10": {
+        "type": "Query",
+        "runAfter": {
+          "Catalog_Validate_Unique_Builds": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "from": "@variables('CatalogRows')",
+          "where": "@and(equals(item()['Family'], 'Windows10'), equals(item()['ReleaseKind'], 'B'))"
+        }
+      },
+      "Catalog_Monthly_Windows11": {
+        "type": "Query",
+        "runAfter": {
+          "Catalog_Validate_Unique_Builds": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "from": "@variables('CatalogRows')",
+          "where": "@and(equals(item()['Family'], 'Windows11'), equals(item()['ReleaseKind'], 'B'))"
+        }
+      },
+      "Catalog_Months_Windows10": {
+        "type": "Select",
+        "runAfter": {
+          "Catalog_Monthly_Windows10": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "from": "@body('Catalog_Monthly_Windows10')",
+          "select": {
+            "Month": "@item()['ReleaseMonth']"
+          }
+        }
+      },
+      "Catalog_Months_Windows11": {
+        "type": "Select",
+        "runAfter": {
+          "Catalog_Monthly_Windows11": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "from": "@body('Catalog_Monthly_Windows11')",
+          "select": {
+            "Month": "@item()['ReleaseMonth']"
+          }
+        }
+      },
+      "Catalog_Validate_Coverage": {
+        "type": "ParseJson",
+        "runAfter": {
+          "Catalog_Months_Windows10": [
+            "Succeeded"
+          ],
+          "Catalog_Months_Windows11": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "content": {
+            "valid": "@and(greaterOrEquals(length(union(body('Catalog_Months_Windows10'), body('Catalog_Months_Windows10'))), 6), greaterOrEquals(length(union(body('Catalog_Months_Windows11'), body('Catalog_Months_Windows11'))), 6))"
+          },
+          "schema": {
+            "type": "object",
+            "required": [
+              "valid"
+            ],
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Catalog_For_Each_Batch": {
+        "type": "Foreach",
+        "runAfter": {
+          "Catalog_Validate_Coverage": [
+            "Succeeded"
+          ]
+        },
+        "foreach": "@chunk(variables('CatalogRows'), 500)",
+        "runtimeConfiguration": {
+          "concurrency": {
+            "repetitions": 1
+          }
+        },
+        "actions": {
+          "Catalog_Batch_JSON": {
+            "type": "Compose",
+            "inputs": "@string(items('Catalog_For_Each_Batch'))"
+          },
+          "Catalog_Validate_Batch_Size": {
+            "type": "ParseJson",
+            "runAfter": {
+              "Catalog_Batch_JSON": [
+                "Succeeded"
+              ]
+            },
+            "inputs": {
+              "content": {
+                "valid": "@lessOrEquals(div(mul(length(base64(outputs('Catalog_Batch_JSON'))), 3), 4), 900000)"
+              },
+              "schema": {
+                "type": "object",
+                "required": [
+                  "valid"
+                ],
+                "properties": {
+                  "valid": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "Catalog_Send_Batch": {
+            "type": "Http",
+            "runAfter": {
+              "Catalog_Validate_Batch_Size": [
+                "Succeeded"
+              ]
+            },
+            "inputs": {
+              "method": "POST",
+              "uri": "@parameters('CatalogIngestionUri')",
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": "@outputs('Catalog_Batch_JSON')",
+              "authentication": {
+                "type": "ManagedServiceIdentity",
+                "audience": "https://monitor.azure.com"
+              },
+              "retryPolicy": {
+                "type": "exponential",
+                "count": 3,
+                "interval": "PT1M"
+              }
+            }
+          }
+        }
+      },
+      "Catalog_Complete_Snapshot": {
+        "type": "Http",
+        "runAfter": {
+          "Catalog_For_Each_Batch": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "method": "POST",
+          "uri": "@parameters('CatalogIngestionUri')",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": [
+            {
+              "SnapshotId": "@workflow().run.name",
+              "SnapshotTime": "@outputs('Snapshot_Time')",
+              "RecordType": "Snapshot",
+              "Family": "",
+              "BaseVersion": "",
+              "FullVersion": "",
+              "Revision": 0,
+              "ReleaseMonth": null,
+              "ReleaseDate": null,
+              "PatchId": "",
+              "ReleaseKind": "",
+              "SourceUrl": ""
+            }
+          ],
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://monitor.azure.com"
+          },
+          "retryPolicy": {
+            "type": "exponential",
+            "count": 3,
+            "interval": "PT1M"
+          }
+        }
+      },
+      "Catalog_Statistics": {
+        "type": "Compose",
+        "runAfter": {
+          "Catalog_Complete_Snapshot": [
+            "Succeeded"
+          ]
+        },
+        "inputs": {
+          "BuildRecords": "@length(variables('CatalogRows'))",
+          "Windows10MonthlyReleases": "@length(union(body('Catalog_Months_Windows10'), body('Catalog_Months_Windows10')))",
+          "Windows11MonthlyReleases": "@length(union(body('Catalog_Months_Windows11'), body('Catalog_Months_Windows11')))"
+        }
+      }
+    }
+  },
+  "Catalog_Failed": {
+    "type": "Terminate",
+    "runAfter": {
+      "Catalog_Collection": [
+        "Failed",
+        "TimedOut"
+      ]
+    },
+    "inputs": {
+      "runStatus": "Failed",
+      "runError": {
+        "code": "CatalogCollectionFailed",
+        "message": "Catalog HTTP, pagination, schema, coverage, or ingestion validation failed. Inspect the failed catalog action; no completion marker is written for incomplete data."
+      }
+    }
+  }
+}

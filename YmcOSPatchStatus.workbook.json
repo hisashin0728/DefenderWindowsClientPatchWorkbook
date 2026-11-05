@@ -1,0 +1,915 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Microsoft 月次OSパッチ適用状況 (Windows 10/11)\n行は月例セキュリティ更新の公開月、列は Defender デバイスグループです。**各月のパッチを最新の端末状態で評価**します。過去の月末時点の履歴ではありません。\n\n**適用率 = 当月の対象ビルド以上に到達した確認済み端末数 ÷ 対象Windows端末数 × 100**。対象はWindows 10/11のみです。同じOS・ビルド系列の後続累積更新も適用済みとします。Graph APIの公開ビルドと照合し、インベントリ欠落・不明なビルド・2日超のデータは未評価です。**未評価は分母に含めますが、適用済みには数えません。全台未評価のセルは「未評価」と表示します。**\n\n基準にするパッチは月例セキュリティ更新のみです。.NET・Office・Defender定義・プレビュー・緊急更新は基準行に含めません。これはOSの到達ビルドによる判定で、KBのインストール成功履歴ではありません。カタログ取得はMicrosoft Graph beta APIを使用します。"
+      },
+      "name": "header"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "p-Workspace",
+            "version": "KqlParameterItem/1.0",
+            "name": "Workspace",
+            "label": "Workspace (Defender データのあるワークスペースを選択)",
+            "type": 5,
+            "isRequired": true,
+            "multiSelect": false,
+            "query": "where type =~ 'microsoft.operationalinsights/workspaces'\n| project value = id, label = name",
+            "typeSettings": {
+              "resourceTypeFilter": {
+                "microsoft.operationalinsights/workspaces": true
+              },
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          },
+          {
+            "id": "p-MonthCount",
+            "version": "KqlParameterItem/1.0",
+            "name": "MonthCount",
+            "label": "表示月数",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": false,
+            "quote": "",
+            "jsonData": "[{\"value\": \"3\", \"label\": \"3\"}, {\"value\": \"6\", \"label\": \"6\"}, {\"value\": \"12\", \"label\": \"12\"}]",
+            "value": "6"
+          },
+          {
+            "id": "p-SiteSel",
+            "version": "KqlParameterItem/1.0",
+            "name": "SiteSel",
+            "label": "拠点 (デバイスグループ)",
+            "type": 2,
+            "isRequired": false,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "DeviceInfo\n| where TimeGenerated > ago(14d)\n| project OSPlatform, MachineGroup, OnboardingStatus, DeviceType\n| where OSPlatform in ('Windows10', 'Windows11')\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where isnotempty(Site)\n| summarize by value = tostring(Site)\n| project value, label = value\n| sort by value asc\n",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "{Workspace}"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::all"
+              ],
+              "showDefault": false
+            },
+            "selectAllValue": "*",
+            "value": [
+              "value::all"
+            ]
+          },
+          {
+            "id": "p-OSSel",
+            "version": "KqlParameterItem/1.0",
+            "name": "OSSel",
+            "label": "OS プラットフォーム",
+            "type": 2,
+            "isRequired": false,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "DeviceInfo\n| where TimeGenerated > ago(14d)\n| project OSPlatform, MachineGroup, OnboardingStatus, DeviceType\n| where OSPlatform in ('Windows10', 'Windows11')\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where isnotempty(OSPlatform)\n| summarize by value = tostring(OSPlatform)\n| project value, label = value\n| sort by value asc\n",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "{Workspace}"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::all"
+              ],
+              "showDefault": false
+            },
+            "selectAllValue": "*",
+            "value": [
+              "value::all"
+            ]
+          },
+          {
+            "id": "p-OnbSel",
+            "version": "KqlParameterItem/1.0",
+            "name": "OnbSel",
+            "label": "オンボード状態",
+            "type": 2,
+            "isRequired": false,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "DeviceInfo\n| where TimeGenerated > ago(14d)\n| project OSPlatform, MachineGroup, OnboardingStatus, DeviceType\n| where OSPlatform in ('Windows10', 'Windows11')\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where isnotempty(OnboardingStatus)\n| summarize by value = tostring(OnboardingStatus)\n| project value, label = value\n| sort by value asc\n",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "{Workspace}"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::all"
+              ],
+              "showDefault": false
+            },
+            "selectAllValue": "*",
+            "value": [
+              "Onboarded"
+            ]
+          },
+          {
+            "id": "p-TypeSel",
+            "version": "KqlParameterItem/1.0",
+            "name": "TypeSel",
+            "label": "デバイス種別",
+            "type": 2,
+            "isRequired": false,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "DeviceInfo\n| where TimeGenerated > ago(14d)\n| project OSPlatform, MachineGroup, OnboardingStatus, DeviceType\n| where OSPlatform in ('Windows10', 'Windows11')\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where isnotempty(DeviceType)\n| summarize by value = tostring(DeviceType)\n| project value, label = value\n| sort by value asc\n",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "{Workspace}"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::all"
+              ],
+              "showDefault": false
+            },
+            "selectAllValue": "*",
+            "value": [
+              "value::all"
+            ]
+          },
+          {
+            "id": "p-MonthSel",
+            "version": "KqlParameterItem/1.0",
+            "name": "MonthSel",
+            "label": "台数・詳細の対象月",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": false,
+            "quote": "",
+            "query": "let CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nunion\n    (print value = 'latest', label = '最新の公開月'),\n    (ShownMonths | project value = format_datetime(ReleaseMonth, 'yyyy-MM-dd'),\n                          label = format_datetime(ReleaseMonth, 'yyyy/MM'))\n| project value, label",
+            "value": "latest",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "{Workspace}"
+            ]
+          },
+          {
+            "id": "p-Tab",
+            "version": "KqlParameterItem/1.0",
+            "name": "Tab",
+            "label": "Tab",
+            "type": 1,
+            "isRequired": false,
+            "isHiddenWhenLocked": true,
+            "value": "monthly"
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces"
+      },
+      "name": "parameters"
+    },
+    {
+      "type": 11,
+      "content": {
+        "version": "LinkItem/1.0",
+        "style": "tabs",
+        "links": [
+          {
+            "id": "tab-monthly",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "月次OSパッチ適用率",
+            "subTarget": "monthly",
+            "style": "link"
+          },
+          {
+            "id": "tab-counts",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "台数内訳",
+            "subTarget": "counts",
+            "style": "link"
+          },
+          {
+            "id": "tab-chart",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "月別グラフ",
+            "subTarget": "chart",
+            "style": "link"
+          },
+          {
+            "id": "tab-detail",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "月例KB・対象ビルド",
+            "subTarget": "detail",
+            "style": "link"
+          },
+          {
+            "id": "tab-devices",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "端末別更新状況",
+            "subTarget": "devices",
+            "style": "link"
+          },
+          {
+            "id": "tab-osver",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "Windows OSビルド",
+            "subTarget": "osver",
+            "style": "link"
+          },
+          {
+            "id": "tab-diag",
+            "cellValue": "Tab",
+            "linkTarget": "parameter",
+            "linkLabel": "データ診断",
+            "subTarget": "diag",
+            "style": "link"
+          }
+        ]
+      },
+      "name": "tabs"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "lazy",
+        "items": [
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nprint\n    InventoryLast = InventoryTime, CatalogLast = CatalogTime,\n    TargetDevices = toscalar(Devices | count),\n    LatestPatchMonth = toscalar(ShownMonths | summarize max(ReleaseMonth)),\n    IngestionState = case(not(CatalogFresh), '要確認: 月例カタログ未取込・2日超過',\n                          not(InventoryFresh), '要確認: OSインベントリ未取込・2日超過',\n                          '取込済み: 未評価台数は台数内訳で確認')",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "データ取込・評価状態",
+              "visualization": "table",
+              "gridSettings": {
+                "labelSettings": [
+                  {
+                    "columnId": "InventoryLast",
+                    "label": "OS情報の最終取込 (UTC)"
+                  },
+                  {
+                    "columnId": "CatalogLast",
+                    "label": "対応表の最終取込 (UTC)"
+                  },
+                  {
+                    "columnId": "TargetDevices",
+                    "label": "対象Windows端末数"
+                  },
+                  {
+                    "columnId": "LatestPatchMonth",
+                    "label": "最新の月例更新"
+                  },
+                  {
+                    "columnId": "IngestionState",
+                    "label": "取込状態"
+                  }
+                ]
+              }
+            },
+            "name": "monthly-status"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet DeviceState = Devices\n| join kind=leftouter Inventory on $left.DeviceId == $right.InventoryDeviceId\n| extend VersionCount = array_length(Versions), PlatformCount = array_length(Platforms),\n         FullVersion = tostring(Versions[0]), InventoryPlatform = tolower(tostring(Platforms[0]))\n| extend BaseVersion = extract(@\"^(\\d+\\.\\d+\\.\\d+)\\.\\d+$\", 1, FullVersion),\n         CurrentRevision = tolong(extract(@\"^\\d+\\.\\d+\\.\\d+\\.(\\d+)$\", 1, FullVersion)),\n         CurrentBuild = tolong(extract(@\"^\\d+\\.\\d+\\.(\\d+)\\.\\d+$\", 1, FullVersion))\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend InventoryReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    not(InventoryFresh), 'OSインベントリ未取込・期限切れ',\n    isempty(InventoryDeviceId), 'OSインベントリなし',\n    VersionCount != 1, 'OSバージョンが一意でない',\n    PlatformCount != 1 or InventoryPlatform != Family, 'OSプラットフォーム不一致',\n    isempty(BaseVersion) or isnull(CurrentRevision), 'フルビルド番号不明',\n    isnull(OSBuild) or OSBuild != CurrentBuild, 'DeviceInfoとTVMのビルド不一致',\n    isnull(KnownPublishedBuild), 'Microsoft公開ビルドとの対応未確認',\n    '');\nlet Evaluations = DeviceState\n| extend CrossKey = 1\n| join kind=inner (ShownMonths | extend CrossKey = 1) on CrossKey\n| lookup kind=leftouter Baselines on Family, BaseVersion, ReleaseMonth\n| extend Reason = iff(isnotempty(InventoryReason), InventoryReason,\n                      iff(isnull(RequiredRevision), '当月の対応する月例更新が未確認', ''))\n| extend Status = case(isnotempty(Reason), 'Unknown',\n                       CurrentRevision >= RequiredRevision, 'Installed', 'NotInstalled');\nlet MonthlySummary = Evaluations\n| summarize Targets = count(), Installed = countif(Status == 'Installed'),\n            NotInstalled = countif(Status == 'NotInstalled'), Unknown = countif(Status == 'Unknown')\n  by ReleaseMonth, Site\n| extend Assessed = Installed + NotInstalled\n| extend PatchRate = iff(Targets > 0 and Assessed > 0, round(100.0 * Installed / Targets, 1), real(null)),\n         Coverage = iff(Targets > 0, round(100.0 * Assessed / Targets, 1), real(null));\nlet SelectedMonth = iff('{MonthSel}' == 'latest',\n    toscalar(ShownMonths | summarize max(ReleaseMonth)), todatetime('{MonthSel}'));\nMonthlySummary\n| where ReleaseMonth == SelectedMonth\n| summarize Targets = sum(Targets), Installed = sum(Installed),\n            NotInstalled = sum(NotInstalled), Unknown = sum(Unknown), Assessed = sum(Assessed)\n| extend Rate = case(Targets == 0, '対象なし', Assessed == 0, '未評価',\n                     strcat(tostring(round(100.0 * Installed / Targets, 1)), '%'))\n| project a = pack_array(\n    bag_pack('Order', 1, 'Label', '対象端末数', 'Value', tostring(Targets)),\n    bag_pack('Order', 2, 'Label', '適用済み端末数', 'Value', tostring(Installed)),\n    bag_pack('Order', 3, 'Label', '未適用端末数', 'Value', tostring(NotInstalled)),\n    bag_pack('Order', 4, 'Label', '未評価端末数', 'Value', tostring(Unknown)),\n    bag_pack('Order', 5, 'Label', '確認済み適用率', 'Value', Rate))\n| mv-expand a\n| project Order = toint(a.Order), Label = tostring(a.Label), Value = tostring(a.Value)\n| sort by Order asc\n| project Label, Value",
+              "size": 4,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "選択月の台数・適用率 (台数・詳細の対象月)",
+              "visualization": "tiles",
+              "tileSettings": {
+                "titleContent": {
+                  "columnMatch": "Label",
+                  "formatter": 1
+                },
+                "leftContent": {
+                  "columnMatch": "Value",
+                  "formatter": 1
+                },
+                "showBorder": true
+              }
+            },
+            "name": "monthly-tiles"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet DeviceState = Devices\n| join kind=leftouter Inventory on $left.DeviceId == $right.InventoryDeviceId\n| extend VersionCount = array_length(Versions), PlatformCount = array_length(Platforms),\n         FullVersion = tostring(Versions[0]), InventoryPlatform = tolower(tostring(Platforms[0]))\n| extend BaseVersion = extract(@\"^(\\d+\\.\\d+\\.\\d+)\\.\\d+$\", 1, FullVersion),\n         CurrentRevision = tolong(extract(@\"^\\d+\\.\\d+\\.\\d+\\.(\\d+)$\", 1, FullVersion)),\n         CurrentBuild = tolong(extract(@\"^\\d+\\.\\d+\\.(\\d+)\\.\\d+$\", 1, FullVersion))\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend InventoryReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    not(InventoryFresh), 'OSインベントリ未取込・期限切れ',\n    isempty(InventoryDeviceId), 'OSインベントリなし',\n    VersionCount != 1, 'OSバージョンが一意でない',\n    PlatformCount != 1 or InventoryPlatform != Family, 'OSプラットフォーム不一致',\n    isempty(BaseVersion) or isnull(CurrentRevision), 'フルビルド番号不明',\n    isnull(OSBuild) or OSBuild != CurrentBuild, 'DeviceInfoとTVMのビルド不一致',\n    isnull(KnownPublishedBuild), 'Microsoft公開ビルドとの対応未確認',\n    '');\nlet Evaluations = DeviceState\n| extend CrossKey = 1\n| join kind=inner (ShownMonths | extend CrossKey = 1) on CrossKey\n| lookup kind=leftouter Baselines on Family, BaseVersion, ReleaseMonth\n| extend Reason = iff(isnotempty(InventoryReason), InventoryReason,\n                      iff(isnull(RequiredRevision), '当月の対応する月例更新が未確認', ''))\n| extend Status = case(isnotempty(Reason), 'Unknown',\n                       CurrentRevision >= RequiredRevision, 'Installed', 'NotInstalled');\nlet MonthlySummary = Evaluations\n| summarize Targets = count(), Installed = countif(Status == 'Installed'),\n            NotInstalled = countif(Status == 'NotInstalled'), Unknown = countif(Status == 'Unknown')\n  by ReleaseMonth, Site\n| extend Assessed = Installed + NotInstalled\n| extend PatchRate = iff(Targets > 0 and Assessed > 0, round(100.0 * Installed / Targets, 1), real(null)),\n         Coverage = iff(Targets > 0, round(100.0 * Assessed / Targets, 1), real(null));\nMonthlySummary\n| extend MonthLabel = format_datetime(ReleaseMonth, 'yyyy/MM'),\n         Rate = case(Targets == 0, 'N/A', Assessed == 0, '未評価', strcat(tostring(PatchRate), '%'))\n| evaluate pivot(Site, take_any(Rate), MonthLabel)\n| sort by MonthLabel asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "月次OSパッチ × デバイスグループ : 適用率",
+              "visualization": "table",
+              "gridSettings": {
+                "labelSettings": [
+                  {
+                    "columnId": "MonthLabel",
+                    "label": "月次OSパッチ"
+                  }
+                ]
+              }
+            },
+            "name": "monthly-matrix"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "monthly"
+      },
+      "name": "tab-monthly-group"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "lazy",
+        "items": [
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet DeviceState = Devices\n| join kind=leftouter Inventory on $left.DeviceId == $right.InventoryDeviceId\n| extend VersionCount = array_length(Versions), PlatformCount = array_length(Platforms),\n         FullVersion = tostring(Versions[0]), InventoryPlatform = tolower(tostring(Platforms[0]))\n| extend BaseVersion = extract(@\"^(\\d+\\.\\d+\\.\\d+)\\.\\d+$\", 1, FullVersion),\n         CurrentRevision = tolong(extract(@\"^\\d+\\.\\d+\\.\\d+\\.(\\d+)$\", 1, FullVersion)),\n         CurrentBuild = tolong(extract(@\"^\\d+\\.\\d+\\.(\\d+)\\.\\d+$\", 1, FullVersion))\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend InventoryReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    not(InventoryFresh), 'OSインベントリ未取込・期限切れ',\n    isempty(InventoryDeviceId), 'OSインベントリなし',\n    VersionCount != 1, 'OSバージョンが一意でない',\n    PlatformCount != 1 or InventoryPlatform != Family, 'OSプラットフォーム不一致',\n    isempty(BaseVersion) or isnull(CurrentRevision), 'フルビルド番号不明',\n    isnull(OSBuild) or OSBuild != CurrentBuild, 'DeviceInfoとTVMのビルド不一致',\n    isnull(KnownPublishedBuild), 'Microsoft公開ビルドとの対応未確認',\n    '');\nlet Evaluations = DeviceState\n| extend CrossKey = 1\n| join kind=inner (ShownMonths | extend CrossKey = 1) on CrossKey\n| lookup kind=leftouter Baselines on Family, BaseVersion, ReleaseMonth\n| extend Reason = iff(isnotempty(InventoryReason), InventoryReason,\n                      iff(isnull(RequiredRevision), '当月の対応する月例更新が未確認', ''))\n| extend Status = case(isnotempty(Reason), 'Unknown',\n                       CurrentRevision >= RequiredRevision, 'Installed', 'NotInstalled');\nlet MonthlySummary = Evaluations\n| summarize Targets = count(), Installed = countif(Status == 'Installed'),\n            NotInstalled = countif(Status == 'NotInstalled'), Unknown = countif(Status == 'Unknown')\n  by ReleaseMonth, Site\n| extend Assessed = Installed + NotInstalled\n| extend PatchRate = iff(Targets > 0 and Assessed > 0, round(100.0 * Installed / Targets, 1), real(null)),\n         Coverage = iff(Targets > 0, round(100.0 * Assessed / Targets, 1), real(null));\nMonthlySummary\n| extend MonthLabel = format_datetime(ReleaseMonth, 'yyyy/MM')\n| evaluate pivot(Site, sum(Unknown), MonthLabel)\n| sort by MonthLabel asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "未評価台数 (適用率の分母に含む)",
+              "visualization": "table",
+              "gridSettings": {
+                "labelSettings": [
+                  {
+                    "columnId": "MonthLabel",
+                    "label": "月次OSパッチ"
+                  }
+                ]
+              }
+            },
+            "name": "monthly-unknown-matrix"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet DeviceState = Devices\n| join kind=leftouter Inventory on $left.DeviceId == $right.InventoryDeviceId\n| extend VersionCount = array_length(Versions), PlatformCount = array_length(Platforms),\n         FullVersion = tostring(Versions[0]), InventoryPlatform = tolower(tostring(Platforms[0]))\n| extend BaseVersion = extract(@\"^(\\d+\\.\\d+\\.\\d+)\\.\\d+$\", 1, FullVersion),\n         CurrentRevision = tolong(extract(@\"^\\d+\\.\\d+\\.\\d+\\.(\\d+)$\", 1, FullVersion)),\n         CurrentBuild = tolong(extract(@\"^\\d+\\.\\d+\\.(\\d+)\\.\\d+$\", 1, FullVersion))\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend InventoryReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    not(InventoryFresh), 'OSインベントリ未取込・期限切れ',\n    isempty(InventoryDeviceId), 'OSインベントリなし',\n    VersionCount != 1, 'OSバージョンが一意でない',\n    PlatformCount != 1 or InventoryPlatform != Family, 'OSプラットフォーム不一致',\n    isempty(BaseVersion) or isnull(CurrentRevision), 'フルビルド番号不明',\n    isnull(OSBuild) or OSBuild != CurrentBuild, 'DeviceInfoとTVMのビルド不一致',\n    isnull(KnownPublishedBuild), 'Microsoft公開ビルドとの対応未確認',\n    '');\nlet Evaluations = DeviceState\n| extend CrossKey = 1\n| join kind=inner (ShownMonths | extend CrossKey = 1) on CrossKey\n| lookup kind=leftouter Baselines on Family, BaseVersion, ReleaseMonth\n| extend Reason = iff(isnotempty(InventoryReason), InventoryReason,\n                      iff(isnull(RequiredRevision), '当月の対応する月例更新が未確認', ''))\n| extend Status = case(isnotempty(Reason), 'Unknown',\n                       CurrentRevision >= RequiredRevision, 'Installed', 'NotInstalled');\nlet MonthlySummary = Evaluations\n| summarize Targets = count(), Installed = countif(Status == 'Installed'),\n            NotInstalled = countif(Status == 'NotInstalled'), Unknown = countif(Status == 'Unknown')\n  by ReleaseMonth, Site\n| extend Assessed = Installed + NotInstalled\n| extend PatchRate = iff(Targets > 0 and Assessed > 0, round(100.0 * Installed / Targets, 1), real(null)),\n         Coverage = iff(Targets > 0, round(100.0 * Assessed / Targets, 1), real(null));\nMonthlySummary\n| project Month = format_datetime(ReleaseMonth, 'yyyy/MM'), Site, Targets, Installed,\n          NotInstalled, Unknown, PatchRate, Coverage\n| sort by Month asc, Site asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "月次OSパッチの台数内訳",
+              "visualization": "table",
+              "gridSettings": {
+                "formatters": [
+                  {
+                    "columnMatch": "Installed",
+                    "formatter": 3,
+                    "formatOptions": {
+                      "palette": "blue"
+                    }
+                  },
+                  {
+                    "columnMatch": "NotInstalled",
+                    "formatter": 3,
+                    "formatOptions": {
+                      "palette": "blue"
+                    }
+                  },
+                  {
+                    "columnMatch": "Unknown",
+                    "formatter": 3,
+                    "formatOptions": {
+                      "palette": "blue"
+                    }
+                  },
+                  {
+                    "columnMatch": "PatchRate",
+                    "formatter": 18,
+                    "formatOptions": {
+                      "thresholdsOptions": "colors",
+                      "thresholdsGrid": [
+                        {
+                          "operator": "<",
+                          "thresholdValue": "80",
+                          "representation": "redBright",
+                          "text": "{0}{1}"
+                        },
+                        {
+                          "operator": "<",
+                          "thresholdValue": "95",
+                          "representation": "orange",
+                          "text": "{0}{1}"
+                        },
+                        {
+                          "operator": "Default",
+                          "representation": "green",
+                          "text": "{0}{1}"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "labelSettings": [
+                  {
+                    "columnId": "Month",
+                    "label": "月次OSパッチ"
+                  },
+                  {
+                    "columnId": "Site",
+                    "label": "デバイスグループ"
+                  },
+                  {
+                    "columnId": "Targets",
+                    "label": "対象端末数"
+                  },
+                  {
+                    "columnId": "Installed",
+                    "label": "適用済み"
+                  },
+                  {
+                    "columnId": "NotInstalled",
+                    "label": "未適用"
+                  },
+                  {
+                    "columnId": "Unknown",
+                    "label": "未評価"
+                  },
+                  {
+                    "columnId": "PatchRate",
+                    "label": "適用率 (%)"
+                  },
+                  {
+                    "columnId": "Coverage",
+                    "label": "評価済み率 (%)"
+                  }
+                ]
+              }
+            },
+            "name": "monthly-counts"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "counts"
+      },
+      "name": "tab-counts-group"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "lazy",
+        "items": [
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet DeviceState = Devices\n| join kind=leftouter Inventory on $left.DeviceId == $right.InventoryDeviceId\n| extend VersionCount = array_length(Versions), PlatformCount = array_length(Platforms),\n         FullVersion = tostring(Versions[0]), InventoryPlatform = tolower(tostring(Platforms[0]))\n| extend BaseVersion = extract(@\"^(\\d+\\.\\d+\\.\\d+)\\.\\d+$\", 1, FullVersion),\n         CurrentRevision = tolong(extract(@\"^\\d+\\.\\d+\\.\\d+\\.(\\d+)$\", 1, FullVersion)),\n         CurrentBuild = tolong(extract(@\"^\\d+\\.\\d+\\.(\\d+)\\.\\d+$\", 1, FullVersion))\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend InventoryReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    not(InventoryFresh), 'OSインベントリ未取込・期限切れ',\n    isempty(InventoryDeviceId), 'OSインベントリなし',\n    VersionCount != 1, 'OSバージョンが一意でない',\n    PlatformCount != 1 or InventoryPlatform != Family, 'OSプラットフォーム不一致',\n    isempty(BaseVersion) or isnull(CurrentRevision), 'フルビルド番号不明',\n    isnull(OSBuild) or OSBuild != CurrentBuild, 'DeviceInfoとTVMのビルド不一致',\n    isnull(KnownPublishedBuild), 'Microsoft公開ビルドとの対応未確認',\n    '');\nlet Evaluations = DeviceState\n| extend CrossKey = 1\n| join kind=inner (ShownMonths | extend CrossKey = 1) on CrossKey\n| lookup kind=leftouter Baselines on Family, BaseVersion, ReleaseMonth\n| extend Reason = iff(isnotempty(InventoryReason), InventoryReason,\n                      iff(isnull(RequiredRevision), '当月の対応する月例更新が未確認', ''))\n| extend Status = case(isnotempty(Reason), 'Unknown',\n                       CurrentRevision >= RequiredRevision, 'Installed', 'NotInstalled');\nlet MonthlySummary = Evaluations\n| summarize Targets = count(), Installed = countif(Status == 'Installed'),\n            NotInstalled = countif(Status == 'NotInstalled'), Unknown = countif(Status == 'Unknown')\n  by ReleaseMonth, Site\n| extend Assessed = Installed + NotInstalled\n| extend PatchRate = iff(Targets > 0 and Assessed > 0, round(100.0 * Installed / Targets, 1), real(null)),\n         Coverage = iff(Targets > 0, round(100.0 * Assessed / Targets, 1), real(null));\nMonthlySummary\n| project ReleaseMonth, Site, PatchRate\n| sort by ReleaseMonth asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "月例更新ごとの適用率 (すべて最新状態で評価)",
+              "visualization": "linechart",
+              "chartSettings": {
+                "xAxis": "ReleaseMonth",
+                "yAxis": [
+                  "PatchRate"
+                ],
+                "group": "Site",
+                "createOtherGroup": null,
+                "ySettings": {
+                  "min": 0,
+                  "max": 100
+                }
+              }
+            },
+            "name": "monthly-line"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "chart"
+      },
+      "name": "tab-chart-group"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "lazy",
+        "items": [
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet SelectedMonth = iff('{MonthSel}' == 'latest',\n    toscalar(ShownMonths | summarize max(ReleaseMonth)), todatetime('{MonthSel}'));\nBaselines\n| where ReleaseMonth == SelectedMonth\n| project Month = format_datetime(ReleaseMonth, 'yyyy/MM'), Family, BaseVersion,\n          PatchId, RequiredFullVersion, ReleaseDate, SourceUrl\n| sort by Family asc, BaseVersion asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "選択月の月例セキュリティKB・対象ビルド",
+              "visualization": "table",
+              "gridSettings": {
+                "labelSettings": [
+                  {
+                    "columnId": "Month",
+                    "label": "公開月"
+                  },
+                  {
+                    "columnId": "Family",
+                    "label": "OS"
+                  },
+                  {
+                    "columnId": "BaseVersion",
+                    "label": "ビルド系列"
+                  },
+                  {
+                    "columnId": "PatchId",
+                    "label": "月例KB"
+                  },
+                  {
+                    "columnId": "RequiredFullVersion",
+                    "label": "適用基準ビルド"
+                  },
+                  {
+                    "columnId": "ReleaseDate",
+                    "label": "公開日"
+                  },
+                  {
+                    "columnId": "SourceUrl",
+                    "label": "Microsoft公式情報"
+                  }
+                ]
+              }
+            },
+            "name": "monthly-baselines"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "detail"
+      },
+      "name": "tab-detail-group"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "lazy",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "### 端末別の月次パッチ到達状況\n適用済み端末も含む全対象端末を表示します。最新の `DeviceInfo` の `OSVersion`・`OSBuild`・`OsBuildRevision` からフルビルドを作り、Graphの月例セキュリティ更新に照合します。\n\n**到達済み月次パッチ**は、同じOS・ビルド系列で現在ビルドが満たす最新の月例更新です。表示月数・比較対象月より前後の更新も含め、カタログ全体から確認します。プレビュー・緊急累積更新も、それ以前の月例基準を満たせば到達済みとします。ビルド不明・Graph対応未確認は未評価とし、TVMインベントリでは補完しません。「確認する月次パッチ」は比較対象月の判定に使用します。"
+            },
+            "name": "device-updates-note"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet SelectedMonth = iff('{MonthSel}' == 'latest',\n    toscalar(ShownMonths | summarize max(ReleaseMonth)), todatetime('{MonthSel}'));\nlet DeviceBuildState = Devices\n| extend CurrentRevision = tolong(OsBuildRevision),\n         BaseVersion = iff(OSVersion matches regex @\"^\\d+\\.\\d+$\" and OSBuild > 0,\n                           strcat(OSVersion, '.', tostring(OSBuild)), '')\n| extend FullVersion = iff(isnotempty(BaseVersion) and isnotnull(CurrentRevision)\n                           and OsBuildRevision matches regex @\"^\\d+$\",\n                           strcat(BaseVersion, '.', tostring(CurrentRevision)), '')\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend BuildReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    LastSeen > now() + 5m, 'DeviceInfoの確認日時が未来',\n    isempty(BaseVersion), 'DeviceInfoのOSVersion/OSBuildが不明・不正',\n    isempty(FullVersion), 'DeviceInfoのOsBuildRevisionが不明・不正',\n    isnull(KnownPublishedBuild), 'Graph公開ビルドとの対応未確認',\n    '');\nDeviceBuildState\n| join kind=leftouter (\n    Baselines\n    | project Family, BaseVersion, MonthlyRelease = ReleaseMonth, MonthlyRevision = RequiredRevision,\n              MonthlyPatchId = PatchId, MonthlyFullVersion = RequiredFullVersion\n) on Family, BaseVersion\n| extend ReachedMonth = iff(isempty(BuildReason) and CurrentRevision >= MonthlyRevision,\n                            MonthlyRelease, datetime(null))\n| summarize arg_max(ReachedMonth, MonthlyPatchId, MonthlyFullVersion),\n            TargetBaselines = countif(MonthlyRelease == SelectedMonth),\n            TargetRevision = take_anyif(MonthlyRevision, MonthlyRelease == SelectedMonth)\n  by DeviceId, Site, DeviceName, DeviceType, OSPlatform, FullVersion, BuildReason,\n     CurrentRevision, LastSeen\n| extend AppliedMonth = case(isnotempty(BuildReason), '未評価',\n                              isnull(ReachedMonth), '該当する月例更新なし',\n                              format_datetime(ReachedMonth, 'yyyy/MM')),\n         AppliedPatchId = iff(isnull(ReachedMonth), '', MonthlyPatchId),\n         AppliedFullVersion = iff(isnull(ReachedMonth), '', MonthlyFullVersion),\n         Reason = case(isnotempty(BuildReason), BuildReason,\n                       isnull(SelectedMonth), '比較対象月が不明',\n                       TargetBaselines != 1, '当月の対応する月例更新が未確認', '')\n| extend Status = case(isnotempty(Reason), '未評価',\n                       CurrentRevision >= TargetRevision, '対象月まで更新済み', '対象月未到達')\n| project Site, DeviceName, DeviceType, OSPlatform, FullVersion, AppliedMonth, AppliedPatchId,\n          AppliedFullVersion, TargetMonth = format_datetime(SelectedMonth, 'yyyy/MM'),\n          Status, Reason, LastSeen\n| sort by Site asc, DeviceName asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "端末ビルドと到達済み月次パッチ",
+              "visualization": "table",
+              "gridSettings": {
+                "filter": true,
+                "labelSettings": [
+                  {
+                    "columnId": "Site",
+                    "label": "デバイスグループ"
+                  },
+                  {
+                    "columnId": "DeviceName",
+                    "label": "端末名"
+                  },
+                  {
+                    "columnId": "DeviceType",
+                    "label": "種別"
+                  },
+                  {
+                    "columnId": "OSPlatform",
+                    "label": "OS"
+                  },
+                  {
+                    "columnId": "FullVersion",
+                    "label": "DeviceInfoのフルビルド"
+                  },
+                  {
+                    "columnId": "AppliedMonth",
+                    "label": "到達済み月次パッチ"
+                  },
+                  {
+                    "columnId": "AppliedPatchId",
+                    "label": "到達済み月例KB"
+                  },
+                  {
+                    "columnId": "AppliedFullVersion",
+                    "label": "到達済み月例基準ビルド"
+                  },
+                  {
+                    "columnId": "TargetMonth",
+                    "label": "比較対象月"
+                  },
+                  {
+                    "columnId": "Status",
+                    "label": "比較対象月の状況"
+                  },
+                  {
+                    "columnId": "Reason",
+                    "label": "判定補足"
+                  },
+                  {
+                    "columnId": "LastSeen",
+                    "label": "DeviceInfoの最終確認"
+                  }
+                ]
+              }
+            },
+            "name": "monthly-devices"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "devices"
+      },
+      "name": "tab-devices-group"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "lazy",
+        "items": [
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet DeviceState = Devices\n| join kind=leftouter Inventory on $left.DeviceId == $right.InventoryDeviceId\n| extend VersionCount = array_length(Versions), PlatformCount = array_length(Platforms),\n         FullVersion = tostring(Versions[0]), InventoryPlatform = tolower(tostring(Platforms[0]))\n| extend BaseVersion = extract(@\"^(\\d+\\.\\d+\\.\\d+)\\.\\d+$\", 1, FullVersion),\n         CurrentRevision = tolong(extract(@\"^\\d+\\.\\d+\\.\\d+\\.(\\d+)$\", 1, FullVersion)),\n         CurrentBuild = tolong(extract(@\"^\\d+\\.\\d+\\.(\\d+)\\.\\d+$\", 1, FullVersion))\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend InventoryReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    not(InventoryFresh), 'OSインベントリ未取込・期限切れ',\n    isempty(InventoryDeviceId), 'OSインベントリなし',\n    VersionCount != 1, 'OSバージョンが一意でない',\n    PlatformCount != 1 or InventoryPlatform != Family, 'OSプラットフォーム不一致',\n    isempty(BaseVersion) or isnull(CurrentRevision), 'フルビルド番号不明',\n    isnull(OSBuild) or OSBuild != CurrentBuild, 'DeviceInfoとTVMのビルド不一致',\n    isnull(KnownPublishedBuild), 'Microsoft公開ビルドとの対応未確認',\n    '');\nlet Evaluations = DeviceState\n| extend CrossKey = 1\n| join kind=inner (ShownMonths | extend CrossKey = 1) on CrossKey\n| lookup kind=leftouter Baselines on Family, BaseVersion, ReleaseMonth\n| extend Reason = iff(isnotempty(InventoryReason), InventoryReason,\n                      iff(isnull(RequiredRevision), '当月の対応する月例更新が未確認', ''))\n| extend Status = case(isnotempty(Reason), 'Unknown',\n                       CurrentRevision >= RequiredRevision, 'Installed', 'NotInstalled');\nDeviceState\n| extend OS = strcat(OSPlatform, ' / ', iff(VersionCount == 1, FullVersion, '未評価'))\n| summarize Devices = count() by Site, OS\n| sort by Site asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "拠点別 Windows フルビルド分布",
+              "visualization": "barchart",
+              "chartSettings": {
+                "xAxis": "Site",
+                "yAxis": [
+                  "Devices"
+                ],
+                "group": "OS",
+                "createOtherGroup": 15
+              }
+            },
+            "name": "osver-dist"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let Devices = DeviceInfo\n| where TimeGenerated > ago(14d)\n| project TimeGenerated, DeviceId, DeviceName, MachineGroup, OSPlatform, OSBuild,\n          OSVersion = tostring(column_ifexists('OSVersion', '')),\n          OsBuildRevision = tostring(column_ifexists('OsBuildRevision', '')),\n          DeviceType, OnboardingStatus\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| where (array_length(dynamic([{OnbSel}])) == 0 or '*' in (dynamic([{OnbSel}])) or OnboardingStatus in (dynamic([{OnbSel}])))\n| extend Site = iff(isempty(MachineGroup), '(未割当)', MachineGroup)\n| where (array_length(dynamic([{SiteSel}])) == 0 or '*' in (dynamic([{SiteSel}])) or Site in (dynamic([{SiteSel}])))\n| where (array_length(dynamic([{OSSel}])) == 0 or '*' in (dynamic([{OSSel}])) or OSPlatform in (dynamic([{OSSel}])))\n| where (array_length(dynamic([{TypeSel}])) == 0 or '*' in (dynamic([{TypeSel}])) or DeviceType in (dynamic([{TypeSel}])))\n| project DeviceId, DeviceName, Site, OSPlatform, OSBuild = tolong(OSBuild),\n          OSVersion, OsBuildRevision, DeviceType, LastSeen = TimeGenerated, Family = tolower(OSPlatform);\nlet CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nlet DeviceState = Devices\n| join kind=leftouter Inventory on $left.DeviceId == $right.InventoryDeviceId\n| extend VersionCount = array_length(Versions), PlatformCount = array_length(Platforms),\n         FullVersion = tostring(Versions[0]), InventoryPlatform = tolower(tostring(Platforms[0]))\n| extend BaseVersion = extract(@\"^(\\d+\\.\\d+\\.\\d+)\\.\\d+$\", 1, FullVersion),\n         CurrentRevision = tolong(extract(@\"^\\d+\\.\\d+\\.\\d+\\.(\\d+)$\", 1, FullVersion)),\n         CurrentBuild = tolong(extract(@\"^\\d+\\.\\d+\\.(\\d+)\\.\\d+$\", 1, FullVersion))\n| lookup kind=leftouter KnownBuilds on Family, FullVersion\n| extend InventoryReason = case(\n    not(CatalogFresh), '月例カタログ未取込・期限切れ',\n    not(InventoryFresh), 'OSインベントリ未取込・期限切れ',\n    isempty(InventoryDeviceId), 'OSインベントリなし',\n    VersionCount != 1, 'OSバージョンが一意でない',\n    PlatformCount != 1 or InventoryPlatform != Family, 'OSプラットフォーム不一致',\n    isempty(BaseVersion) or isnull(CurrentRevision), 'フルビルド番号不明',\n    isnull(OSBuild) or OSBuild != CurrentBuild, 'DeviceInfoとTVMのビルド不一致',\n    isnull(KnownPublishedBuild), 'Microsoft公開ビルドとの対応未確認',\n    '');\nlet Evaluations = DeviceState\n| extend CrossKey = 1\n| join kind=inner (ShownMonths | extend CrossKey = 1) on CrossKey\n| lookup kind=leftouter Baselines on Family, BaseVersion, ReleaseMonth\n| extend Reason = iff(isnotempty(InventoryReason), InventoryReason,\n                      iff(isnull(RequiredRevision), '当月の対応する月例更新が未確認', ''))\n| extend Status = case(isnotempty(Reason), 'Unknown',\n                       CurrentRevision >= RequiredRevision, 'Installed', 'NotInstalled');\nDeviceState\n| summarize Devices = count() by Site, OSPlatform, FullVersion, InventoryReason\n| sort by Site asc, OSPlatform asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "Windows インベントリ検証",
+              "visualization": "table",
+              "gridSettings": {
+                "labelSettings": [
+                  {
+                    "columnId": "Site",
+                    "label": "デバイスグループ"
+                  },
+                  {
+                    "columnId": "OSPlatform",
+                    "label": "OS"
+                  },
+                  {
+                    "columnId": "FullVersion",
+                    "label": "フルビルド"
+                  },
+                  {
+                    "columnId": "InventoryReason",
+                    "label": "判定できない理由"
+                  },
+                  {
+                    "columnId": "Devices",
+                    "label": "端末数"
+                  }
+                ]
+              }
+            },
+            "name": "osver-validation"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "osver"
+      },
+      "name": "tab-osver-group"
+    },
+    {
+      "type": 12,
+      "content": {
+        "version": "NotebookGroup/1.0",
+        "groupType": "editable",
+        "loadType": "lazy",
+        "items": [
+          {
+            "type": 1,
+            "content": {
+              "json": "### データ診断\nWindows 10/11を対象に、`DeviceInfo`、`DeviceWindowsOsInventory_CL`、`WindowsMonthlyPatchCatalog_CL` を使用します。後者2表は Logic App と Automation Runbook による日次収集です。Snapshot 行は全件送信完了の印です。新しい取込が失敗した場合、途中のデータを適用判定に使いません。旧 `DeviceTvmOsPatch_CL` の脆弱性情報と、移行前のWindows Server履歴は、この適用率計算には使いません。"
+            },
+            "name": "diag-note"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "DeviceInfo\n| where TimeGenerated > ago(30d)\n| project TimeGenerated, DeviceId, OnboardingStatus, DeviceType, OSPlatform, MachineGroup\n| summarize arg_max(TimeGenerated, *) by DeviceId\n| where OSPlatform in ('Windows10', 'Windows11')\n| summarize Devices = count(), LastRecord = max(TimeGenerated) by OnboardingStatus, DeviceType, OSPlatform, MachineGroup\n| sort by Devices desc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "DeviceInfo (過去30日・端末ごと最新)",
+              "visualization": "table"
+            },
+            "name": "diag-deviceinfo"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "DeviceWindowsOsInventory_CL\n| summarize Rows = count(), Devices = dcountif(DeviceId, RecordType == 'Device'),\n            First = min(TimeGenerated), Last = max(TimeGenerated) by RecordType",
+              "size": 4,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "Windows フルビルドの取込範囲",
+              "visualization": "table"
+            },
+            "name": "diag-inventory-range"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(30d) and RecordType == 'Device'\n| summarize Rows = count(), Devices = dcount(DeviceId) by Day = bin(TimeGenerated, 1d)\n| sort by Day asc",
+              "size": 1,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "Windows インベントリ日次取込 (過去30日)",
+              "visualization": "barchart"
+            },
+            "name": "diag-inventory-daily"
+          },
+          {
+            "type": 3,
+            "content": {
+              "version": "KqlItem/1.0",
+              "query": "let CatalogMetadata = toscalar(WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet CatalogSnapshotId = tostring(CatalogMetadata.SnapshotId);\nlet CatalogTime = todatetime(CatalogMetadata.TimeGenerated);\nlet CatalogFresh = isnotnull(CatalogTime) and CatalogTime > ago(2d) and CatalogTime <= now() + 5m;\nlet PublishedBuilds = WindowsMonthlyPatchCatalog_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Build' and SnapshotId == CatalogSnapshotId\n| where ReleaseDate <= now()\n| project Family = tolower(Family), BaseVersion, FullVersion, Revision, ReleaseMonth,\n          ReleaseDate, PatchId, ReleaseKind, SourceUrl\n| where Family in ('windows10', 'windows11');\nlet KnownBuilds = PublishedBuilds\n| summarize by Family, FullVersion\n| extend KnownPublishedBuild = 1;\nlet Baselines = PublishedBuilds\n| where ReleaseKind == 'B'\n| summarize arg_max(Revision, *) by Family, BaseVersion, ReleaseMonth\n| project Family, BaseVersion, ReleaseMonth, RequiredRevision = Revision,\n          RequiredFullVersion = FullVersion, PatchId, ReleaseDate, SourceUrl;\nlet ShownMonths = Baselines\n| summarize by ReleaseMonth\n| top toint('{MonthCount}') by ReleaseMonth desc;\nlet InventoryMetadata = toscalar(DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Snapshot'\n| top 1 by TimeGenerated desc\n| project Metadata = bag_pack('SnapshotId', SnapshotId, 'TimeGenerated', TimeGenerated));\nlet InventorySnapshotId = tostring(InventoryMetadata.SnapshotId);\nlet InventoryTime = todatetime(InventoryMetadata.TimeGenerated);\nlet InventoryFresh = isnotnull(InventoryTime) and InventoryTime > ago(2d) and InventoryTime <= now() + 5m;\nlet Inventory = DeviceWindowsOsInventory_CL\n| where TimeGenerated > ago(14d) and RecordType == 'Device' and SnapshotId == InventorySnapshotId\n| summarize Versions = make_set(SoftwareVersion, 16), Platforms = make_set(OSPlatform, 16) by DeviceId\n| project InventoryDeviceId = DeviceId, Versions, Platforms;\nPublishedBuilds\n| summarize Builds = count(), LatestMonthlyRelease = maxif(ReleaseMonth, ReleaseKind == 'B')\n  by Family\n| sort by Family asc",
+              "size": 0,
+              "queryType": 0,
+              "resourceType": "microsoft.operationalinsights/workspaces",
+              "crossComponentResources": [
+                "{Workspace}"
+              ],
+              "timeContext": {
+                "durationMs": 2592000000
+              },
+              "title": "Microsoft Graph対応表の収集範囲",
+              "visualization": "table"
+            },
+            "name": "diag-catalog-coverage"
+          }
+        ]
+      },
+      "conditionalVisibility": {
+        "parameterName": "Tab",
+        "comparison": "isEqualTo",
+        "value": "diag"
+      },
+      "name": "tab-diag-group"
+    }
+  ],
+  "fallbackResourceIds": [],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
