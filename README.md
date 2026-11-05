@@ -12,6 +12,12 @@
 | `logic-defender-os-patch-ingest` | **Graph security API v1.0の `runHuntingQuery`** でDefender TVMのWindows 10/11インベントリを取得 | `DeviceWindowsOsInventory_CL` |
 | `logic-windows-patch-catalog-ingest` | **Graph betaのWindows Updateカタログ** から月例更新を取得し、ページング・検証・正規化 | `WindowsMonthlyPatchCatalog_CL` |
 
+## 実際の画面イメージ
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/ac6ce8d8-a97b-4356-8520-d80aa402c913" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/19d25c12-92c6-45d8-abd4-4c2c66f62887" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/0d5af394-5869-4dec-988c-dc9e09de41cb" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/bc1c94d9-f3b0-4d15-983d-72585842aacf" />
+
 ## 全体像
 
 このリポジトリは、**「Windows 10/11 の端末に、今月の Windows 更新プログラム（月例パッチ）が適用されているか」を、拠点（Defender のデバイスグループ）ごとに Sentinel のブックで見られるようにする**ためのテンプレート一式です。
