@@ -12,7 +12,7 @@
 | `logic-defender-os-patch-ingest` | **Graph security API v1.0の `runHuntingQuery`** でDefender TVMのWindows 10/11インベントリを取得 | `DeviceWindowsOsInventory_CL` |
 | `logic-windows-patch-catalog-ingest` | **Graph betaのWindows Updateカタログ** から月例更新を取得し、ページング・検証・正規化 | `WindowsMonthlyPatchCatalog_CL` |
 
-## はじめに（初心者向けの全体像）
+## 全体像
 
 このリポジトリは、**「Windows 10/11 の端末に、今月の Windows 更新プログラム（月例パッチ）が適用されているか」を、拠点（Defender のデバイスグループ）ごとに Sentinel のブックで見られるようにする**ためのテンプレート一式です。
 
